@@ -1,6 +1,6 @@
 // Given an integer k and a string s, find the length of the longest substring that contains
 // at most k distinct characters. For example, given s = "abcba" and k = 2, the longest substring
-// with k distinct characters is "bcb". Implement in an HTTP endpoint using the standard library.
+// with k distinct characters is "bcb". Implement as an HTTP endpoint using the standard library.
 // Use bluele/gcache to cache evaluated results.
 
 package main
@@ -27,10 +27,10 @@ type Stack struct {
 
 // Push a rune onto the back of the stack if it does not already exist on it,
 // and remove the front value if capacity is exceeded, returning exit codes of 0 and 1, respectively.
-// Return the rune's value as an integer if popped.
+// Return the given rune's code as an integer if popped.
 //
 // Note that this function returns an integer, which could be a rune code
-// to be used in the default case, the event of which is a new substring created.
+// to be used in the default case, the event of which is a new substring being created.
 // We assume that the input string will never contain U+0000 (NULL) or U+0001 (Start of Heading).
 func (s *Stack) Push(r rune) int {
 	for e := s.Items.Front(); e != nil; e = e.Next() {
@@ -49,23 +49,31 @@ func (s *Stack) Push(r rune) int {
 	return 1
 }
 
+// Get the length of the longest substring in string s with at most k distinct characters.
 func getLongestSubstringLength(k int, s string) int {
-	s += "\000" // We need to add a null byte to flush the buffer
+	// Add a terminator so we can push the string all the way through.
+	s += "\000"
 
+	// Iterate through the input string and map the lengths of encountered substrings.
+	// To determine length, we sum the number of characters in the current substring
+	// with the number of times we've encountered duplicates.
+	//
+	// Note that we use default to catch any returned rune code as states 0 and 1 are the
+	// only other possible returns from Stack.Push().
 	duplicates := map[rune]int{}
 	lengths := []int{}
 	stack := Stack{Length: k, Items: list.List{}}
 	for _, c := range s {
 		result := stack.Push(c)
 		switch result {
-		case 0: // Duplicate found; increment corresponding counter
+		case 0:
 			duplicates[c] += 1
-		case 1: // No change; register character in duplicates map
+		case 1:
 			duplicates[c] = 0
-		default: // New substring started; delete outgoing character entry, register substring length
+		default:
 			length := stack.Items.Len()
-			for _, v := range duplicates {
-				length += v
+			for _, d := range duplicates {
+				length += d
 			}
 			delete(duplicates, rune(result))
 			lengths = append(lengths, length)
@@ -77,14 +85,14 @@ func getLongestSubstringLength(k int, s string) int {
 		return len(s) - 1
 	}
 
-	m := 0
-	for _, e := range lengths {
-		if m < e {
-			m = e
+	max := 0
+	for _, l := range lengths {
+		if max < l {
+			max = l
 		}
 	}
 
-	return m
+	return max
 }
 
 func SubstringLengthHandler(w http.ResponseWriter, r *http.Request) {
@@ -96,11 +104,11 @@ func SubstringLengthHandler(w http.ResponseWriter, r *http.Request) {
 	}
 	defer r.Body.Close()
 
+	// Expect the request body to be in the format k,s
 	contents := strings.Split(string(data), ",")
 	if len(contents) != 2 {
 		w.WriteHeader(400)
 	}
-
 	k, err := strconv.Atoi(contents[0])
 	if err != nil {
 		w.WriteHeader(400)
@@ -109,6 +117,7 @@ func SubstringLengthHandler(w http.ResponseWriter, r *http.Request) {
 	}
 	s := contents[1]
 
+	// Create a strict-length hash to efficiently support long inputs
 	hasher := sha256.New()
 	hasher.Write([]byte(s))
 	hash := hasher.Sum(nil)
