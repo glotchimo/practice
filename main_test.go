@@ -10,7 +10,7 @@ import (
 
 func TestSubstringLengthHandler(t *testing.T) {
 	b := bytes.Buffer{}
-	b.WriteString("2,abcba")
+	b.WriteString("2,abcbcba")
 
 	req := httptest.NewRequest(http.MethodPost, "/?=2", &b)
 	rec := httptest.NewRecorder()
