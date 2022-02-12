@@ -1,4 +1,4 @@
-module github.com/glotchimo/scraper
+module github.com/glotchimo/practice
 
 go 1.17
 
