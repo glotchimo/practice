@@ -2,36 +2,26 @@
 // at most k distinct characters. For example, given s = "abcba" and k = 2, the longest substring
 // with k distinct characters is "bcb". Implement in an HTTP endpoint using the standard library.
 // Use bluele/gcache to cache evaluated results.
-//
-// We can keep track of the length of the current substring while we're only seeing two letters
-// in a stack, and when we encounter a new one, we pop and start the counter over. We could also use
-// slicing and only peek the last two letters that have appeared and keep a big list. But that's not
-// very efficient or elegant. The stack would be initialized with k as the length. It would need to be
-// a stack that only contains unique values so we don't end up pushing more than one of the same
-// character. This could be implemented logically in the push function.
-//
-// If k > number of distinct characters in the string, we have to rely on the length of Stack.Items.
-//
-// 01 : read a
-//      length = 1
-// 02 : read b
-//      length = 2
-// 03 : read c
-//      drop a
-//
-// substring length = length of registered characters + number of duplicates seen
 
 package main
 
 import (
+	"bytes"
 	"container/list"
+	"crypto/sha256"
 	"fmt"
 	"io"
 	"log"
+	"math/rand"
 	"net/http"
 	"strconv"
 	"strings"
+	"time"
+
+	"github.com/bluele/gcache"
 )
+
+var Cache gcache.Cache
 
 type Stack struct {
 	Length int
@@ -39,16 +29,16 @@ type Stack struct {
 }
 
 // Push a rune onto the back of the stack if it does not already exist on it,
-// and remove the front value if capacity is exceeded. Return the rune's value
-// as an integer if popped.
-func (s *Stack) Push(item rune) int {
+// and remove the front value if capacity is exceeded, returning exit codes of 0 and 1, respectively.
+// Return the rune's value as an integer if popped.
+func (s *Stack) Push(r rune) int {
 	for e := s.Items.Front(); e != nil; e = e.Next() {
-		if e.Value.(rune) == item {
+		if e.Value.(rune) == r {
 			return 0
 		}
 	}
 
-	s.Items.PushBack(item)
+	s.Items.PushBack(r)
 	if s.Items.Len() == s.Length+1 {
 		p := s.Items.Front()
 		s.Items.Remove(p)
@@ -59,7 +49,7 @@ func (s *Stack) Push(item rune) int {
 }
 
 func getLongestSubstringLength(k int, s string) int {
-	s += "\\0" // We need to add a null byte to flush the buffer
+	s += "\000" // We need to add a null byte to flush the buffer
 
 	duplicates := map[rune]int{}
 	lengths := []int{}
@@ -70,7 +60,7 @@ func getLongestSubstringLength(k int, s string) int {
 		// We assume that the input string will never contain U+0000 (NULL) or U+0001 (Start of Heading).
 		result := stack.Push(c)
 		switch result {
-		case 0: // Duplicate found; increment counter
+		case 0: // Duplicate found; increment corresponding counter
 			duplicates[c] += 1
 		case 1: // No change; register character in duplicates map
 			duplicates[c] = 0
@@ -85,7 +75,10 @@ func getLongestSubstringLength(k int, s string) int {
 		}
 	}
 
-	// Find the max length
+	if stack.Items.Len() < k {
+		return len(s) - 1
+	}
+
 	m := 0
 	for _, e := range lengths {
 		if m < e {
@@ -118,11 +111,63 @@ func SubstringLengthHandler(w http.ResponseWriter, r *http.Request) {
 	}
 	s := contents[1]
 
-	length := getLongestSubstringLength(k, s)
+	hasher := sha256.New()
+	hasher.Write([]byte(s))
+	hash := hasher.Sum(nil)
+	strHash := string(hash)
+
+	length, errGet := Cache.Get(strHash)
+	if errGet != nil {
+		length = getLongestSubstringLength(k, s)
+		if errSet := Cache.Set(strHash, length); errSet != nil {
+			w.WriteHeader(500)
+			fmt.Fprintf(w, "Cache write failed: %s", err.Error())
+			return
+		}
+	}
 	fmt.Fprintf(w, "%d", length)
+}
+
+func init() {
+	Cache = gcache.New(10).Build()
 }
 
 func main() {
 	http.HandleFunc("/", SubstringLengthHandler)
-	log.Fatal(http.ListenAndServe(":8080", nil))
+	go func() { log.Fatal(http.ListenAndServe(":8080", nil)) }()
+
+	letters := []string{"a", "b", "c", "d", "e", "f"}
+	builder := strings.Builder{}
+	rand.Seed(time.Now().UnixNano())
+	for i := 0; i < 1000000; i++ {
+		builder.WriteString(letters[rand.Intn(len(letters))])
+	}
+	s := builder.String()
+
+	b := bytes.Buffer{}
+	b.WriteString("3," + s)
+	req1, _ := http.NewRequest("POST", "http://localhost:8080/", &b)
+	res1, err := http.DefaultClient.Do(req1)
+	if err != nil {
+		panic(err)
+	}
+	data1, err := io.ReadAll(res1.Body)
+	if err != nil {
+		panic(err)
+	}
+	defer res1.Body.Close()
+	fmt.Println(string(data1))
+
+	b.WriteString("3," + s)
+	req2, _ := http.NewRequest("POST", "http://localhost:8080/", &b)
+	res2, err := http.DefaultClient.Do(req2)
+	if err != nil {
+		panic(err)
+	}
+	data2, err := io.ReadAll(res2.Body)
+	if err != nil {
+		panic(err)
+	}
+	defer res2.Body.Close()
+	fmt.Println(string(data2))
 }
