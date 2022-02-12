@@ -58,27 +58,8 @@ func (s *Stack) Push(item rune) int {
 	return 1
 }
 
-func SubstringLengthHandler(w http.ResponseWriter, r *http.Request) {
-	data, err := io.ReadAll(r.Body)
-	if err != nil {
-		w.WriteHeader(400)
-		w.Write([]byte(err.Error()))
-		return
-	}
-	defer r.Body.Close()
-
-	contents := strings.Split(string(data), ",")
-	if len(contents) != 2 {
-		w.WriteHeader(400)
-	}
-
-	k, err := strconv.Atoi(contents[0])
-	if err != nil {
-		w.WriteHeader(400)
-		w.Write([]byte(err.Error()))
-		return
-	}
-	s := contents[1] + "\\0" // We need to add a null character to flush the buffer
+func getLongestSubstringLength(k int, s string) int {
+	s += "\\0" // We need to add a null byte to flush the buffer
 
 	duplicates := map[rune]int{}
 	lengths := []int{}
@@ -112,7 +93,33 @@ func SubstringLengthHandler(w http.ResponseWriter, r *http.Request) {
 		}
 	}
 
-	fmt.Fprintf(w, "%d", m)
+	return m
+}
+
+func SubstringLengthHandler(w http.ResponseWriter, r *http.Request) {
+	data, err := io.ReadAll(r.Body)
+	if err != nil {
+		w.WriteHeader(400)
+		w.Write([]byte(err.Error()))
+		return
+	}
+	defer r.Body.Close()
+
+	contents := strings.Split(string(data), ",")
+	if len(contents) != 2 {
+		w.WriteHeader(400)
+	}
+
+	k, err := strconv.Atoi(contents[0])
+	if err != nil {
+		w.WriteHeader(400)
+		w.Write([]byte(err.Error()))
+		return
+	}
+	s := contents[1]
+
+	length := getLongestSubstringLength(k, s)
+	fmt.Fprintf(w, "%d", length)
 }
 
 func main() {
