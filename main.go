@@ -6,17 +6,14 @@
 package main
 
 import (
-	"bytes"
 	"container/list"
 	"crypto/sha256"
 	"fmt"
 	"io"
 	"log"
-	"math/rand"
 	"net/http"
 	"strconv"
 	"strings"
-	"time"
 
 	"github.com/bluele/gcache"
 )
@@ -31,6 +28,10 @@ type Stack struct {
 // Push a rune onto the back of the stack if it does not already exist on it,
 // and remove the front value if capacity is exceeded, returning exit codes of 0 and 1, respectively.
 // Return the rune's value as an integer if popped.
+//
+// Note that this function returns an integer, which could be a rune code
+// to be used in the default case, the event of which is a new substring created.
+// We assume that the input string will never contain U+0000 (NULL) or U+0001 (Start of Heading).
 func (s *Stack) Push(r rune) int {
 	for e := s.Items.Front(); e != nil; e = e.Next() {
 		if e.Value.(rune) == r {
@@ -55,9 +56,6 @@ func getLongestSubstringLength(k int, s string) int {
 	lengths := []int{}
 	stack := Stack{Length: k, Items: list.List{}}
 	for _, c := range s {
-		// Note that the Stack.Push function returns an integer, which could be a rune code
-		// to be used in the default case, the event of which is a new substring created.
-		// We assume that the input string will never contain U+0000 (NULL) or U+0001 (Start of Heading).
 		result := stack.Push(c)
 		switch result {
 		case 0: // Duplicate found; increment corresponding counter
@@ -134,40 +132,5 @@ func init() {
 
 func main() {
 	http.HandleFunc("/", SubstringLengthHandler)
-	go func() { log.Fatal(http.ListenAndServe(":8080", nil)) }()
-
-	letters := []string{"a", "b", "c", "d", "e", "f"}
-	builder := strings.Builder{}
-	rand.Seed(time.Now().UnixNano())
-	for i := 0; i < 1000000; i++ {
-		builder.WriteString(letters[rand.Intn(len(letters))])
-	}
-	s := builder.String()
-
-	b := bytes.Buffer{}
-	b.WriteString("3," + s)
-	req1, _ := http.NewRequest("POST", "http://localhost:8080/", &b)
-	res1, err := http.DefaultClient.Do(req1)
-	if err != nil {
-		panic(err)
-	}
-	data1, err := io.ReadAll(res1.Body)
-	if err != nil {
-		panic(err)
-	}
-	defer res1.Body.Close()
-	fmt.Println(string(data1))
-
-	b.WriteString("3," + s)
-	req2, _ := http.NewRequest("POST", "http://localhost:8080/", &b)
-	res2, err := http.DefaultClient.Do(req2)
-	if err != nil {
-		panic(err)
-	}
-	data2, err := io.ReadAll(res2.Body)
-	if err != nil {
-		panic(err)
-	}
-	defer res2.Body.Close()
-	fmt.Println(string(data2))
+	log.Fatal(http.ListenAndServe(":8080", nil))
 }
