@@ -10,7 +10,7 @@ import (
 
 func TestSubstringLengthHandler(t *testing.T) {
 	b := bytes.Buffer{}
-	b.WriteString("2,abcbcba")
+	b.WriteString("3,abcabcdefdefdef")
 
 	req := httptest.NewRequest(http.MethodPost, "/?=2", &b)
 	rec := httptest.NewRecorder()
@@ -28,7 +28,7 @@ func TestSubstringLengthHandler(t *testing.T) {
 		t.Errorf("expected 200 got %d", res.StatusCode)
 	}
 
-	if string(data) != "3" {
-		t.Errorf("expected 3 got %s", string(data))
+	if string(data) != "9" {
+		t.Errorf("expected 9 got %s", string(data))
 	}
 }

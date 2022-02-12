@@ -78,7 +78,7 @@ func SubstringLengthHandler(w http.ResponseWriter, r *http.Request) {
 		w.Write([]byte(err.Error()))
 		return
 	}
-	s := contents[1]
+	s := contents[1] + "\\0" // We need to add a null character to flush the buffer
 
 	duplicates := map[rune]int{}
 	lengths := []int{}
@@ -86,32 +86,28 @@ func SubstringLengthHandler(w http.ResponseWriter, r *http.Request) {
 	for _, c := range s {
 		// Note that the Stack.Push function returns an integer, which could be a rune code
 		// to be used in the default case, the event of which is a new substring created.
-		// We assume that the input string will never contain U+0000 (NULL) or U+0001 (Start of Heading)
+		// We assume that the input string will never contain U+0000 (NULL) or U+0001 (Start of Heading).
 		result := stack.Push(c)
 		switch result {
-		case 0: // Duplicate found; counter incremented
+		case 0: // Duplicate found; increment counter
 			duplicates[c] += 1
-		case 1: // No change; character added to unfilled buffer
+		case 1: // No change; register character in duplicates map
 			duplicates[c] = 0
-		default: // New substring started; oldest character popped from stack and removed from duplicates map
-			delete(duplicates, rune(result))
+		default: // New substring started; delete outgoing character entry, register substring length
 			length := stack.Items.Len()
-			for e := stack.Items.Front(); e != nil; e = e.Next() {
-				length += duplicates[e.Value.(rune)]
+			for _, v := range duplicates {
+				length += v
 			}
+			delete(duplicates, rune(result))
 			lengths = append(lengths, length)
 			break
 		}
 	}
 
-	if stack.Items.Len() < k {
-		fmt.Fprintf(w, "%d", stack.Items.Len())
-		return
-	}
-
+	// Find the max length
 	m := 0
-	for i, e := range lengths {
-		if i == 0 || e < m {
+	for _, e := range lengths {
+		if m < e {
 			m = e
 		}
 	}
