@@ -131,7 +131,7 @@ func SubstringLengthHandler(w http.ResponseWriter, r *http.Request) {
 	fmt.Fprintf(w, "%d", length)
 }
 
-func a() {
+func A() {
 	http.HandleFunc("/", SubstringLengthHandler)
 	log.Fatal(http.ListenAndServe(":8080", nil))
 }

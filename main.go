@@ -9,6 +9,7 @@ func init() {
 }
 
 func main() {
-	a()
-	b()
+	// A()
+	// B()
+	C()
 }

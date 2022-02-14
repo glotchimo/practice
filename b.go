@@ -59,7 +59,7 @@ func AutocompleteHandler(w http.ResponseWriter, r *http.Request) {
 	}
 }
 
-func b() {
+func B() {
 	http.HandleFunc("/", AutocompleteHandler)
 	http.ListenAndServe(":8080", nil)
 }
