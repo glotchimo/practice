@@ -14,11 +14,7 @@ import (
 	"net/http"
 	"strconv"
 	"strings"
-
-	"github.com/bluele/gcache"
 )
-
-var Cache gcache.Cache
 
 type Stack struct {
 	Length int
@@ -135,11 +131,7 @@ func SubstringLengthHandler(w http.ResponseWriter, r *http.Request) {
 	fmt.Fprintf(w, "%d", length)
 }
 
-func init() {
-	Cache = gcache.New(10).Build()
-}
-
-func main() {
+func a() {
 	http.HandleFunc("/", SubstringLengthHandler)
 	log.Fatal(http.ListenAndServe(":8080", nil))
 }
